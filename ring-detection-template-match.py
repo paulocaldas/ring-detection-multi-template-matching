@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 """
 Created on Wed Apr 29 15:44:42 2020
 @author: pcaldas
@@ -11,7 +12,6 @@ import glob
 import os
 
 import cv2
-import skimage as sk
 from skimage import io
 from skimage.feature import match_template, peak_local_max
 import tifffile as tiff
@@ -22,17 +22,19 @@ def import_templates(temp_dir_files):
     templates = [io.imread(file) for file in glob.glob(temp_dir_files)]
     return templates
 
-def time_projection(movie_array, step = 30):
+def time_projection(movie_array, step = 30, clip = -1):
     '''computes mean intensity projection acording to step size)
-    returns a 2D array with n-step frames than the original movie'''
+    returns a 2D array with n-step frames of the original movie'''
     
     time_proj_mov = []
     
-    for i, frame in enumerate(movie_array[:-step]):
+    for i, frame in enumerate(movie_array[:clip:][:-step]):
+  
         mean_proj = np.mean(movie_array[i:i + step], axis = 0)
-        mean_proj = mean_proj / sk.filters.gaussian(mean_proj, sigma = 50)
+        #mean_proj = mean_proj / sk.filters.gaussian(mean_proj, sigma = 50)
         time_proj_mov.append(mean_proj)
     
+    # each new frame is a projection of the next "step" frames
     return np.array(time_proj_mov)
 
 def save_movie_astif(movie_array, filename = '_time_projection'):
@@ -72,21 +74,31 @@ def ring_search(target_image, template_list, threshold = 0.7, diameter = 8, show
         angles = [0, 90, 180, 270]
 
         for angle in angles:
+            
             rotation = cv2.getRotationMatrix2D(temp_center, angle, 1)
             rotated_template = cv2.warpAffine(template, rotation, (h, w))
 
-            # use match_template function from skimage and peak_local_max
+            # use match_template function from skimage
+            # returns the corr. coeff between the image and the template at each position
+            
             find_rings = match_template(target_image, rotated_template, pad_input = True)
-
+            
+            # to search for the best match we need to search for peaks
+            # threshold controls the minimum intensity of peaks, i.e 
+            # the minimum corr coeff to consider the ring in this scenario
+            
             coordinates = peak_local_max(find_rings, 
-                                         num_peaks = 200,
+                                         num_peaks = 500,
                                          threshold_abs = threshold,
                                          min_distance = diameter,
                                          exclude_border = True, 
                                          indices = True)
 
             all_ring_coord.append([list(rings) for rings in coordinates])
-
+            
+            # pad_input=True matches correspond to the center of the template
+            # (otherwise to the top-left corner)
+            
     # unpack sublists into a single list of coordenates
     all_ring_coord = [j for i in all_ring_coord for j in i]
     
@@ -115,10 +127,11 @@ def search_rings_movie(filename_dir, templates_dir, threshold = 0.7, time_interv
     a mean intensity projection is first applied. number of frames is set by proj_frames variable, 30 by default
     threhsold sets the sensibility of the algorithm to find a match, 0.7 by default;
     clip: truncate the movie for the analysis, whole movie by default (-1)
-    step: analyze only the nth (step) frame for every movie, all frames by default'''
+    step: analyze only the nth (step) frame for every movie, all frames by default (1)
+    time_interval: seconds per frames'''
     
     print('processing the movie (mean intensity projection)')
-    time_proj_mov = time_projection(io.imread(filename_dir), step = proj_frames) # compute time_projection
+    time_proj_mov = time_projection(io.imread(filename_dir)[:clip], step = proj_frames) # compute time_projection
     templates = import_templates(templates_dir) # load template images
     
     # create a directory to save image results - this is just a sanity check, we can delete later
@@ -161,10 +174,13 @@ def plot_results(rings_found):
     plt.xlabel('time (sec)')
     plt.ylabel('# rings found')
     
+    return X,Y
     
 # RUN THE ANALYSIS
 
-filename = "movies/FtsZ Alone 2018.01.16 ExpI (short).tif"
 template_folder = "templates/*.png"
+folder = "C:\\Users\\comics\\Desktop\\IST Austria\\batir_manuscript\\ring-detection\\1.5 uM FtsZ\\"
+wt = 'WT27_00_raw.tif'
+exp = "BGS Gaussian_200528_ch7_FtsZ L169R 1.5uM 0.2A_LPO5%_3_Tirf488.tif"
 
-rings_found = search_rings_movie(filename, template_folder, clip = 11, step = 10)
+#rings_found = search_rings_movie(folder+wt, template_folder, clip = 500, step = 30)
