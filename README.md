@@ -1,6 +1,6 @@
 ## Ring Detection in Microscopy Time-Lapse Data
 
-This repository contains a Python-based pipeline for detecting ring-like structures in fluorescence microscopy time-lapse recordings. It uses intensity projection and template matching to identify and count ring formations over time.
+This is a "alpha version" script for detecting ring-like structures in fluorescence microscopy time-lapse recordings. It uses intensity projection and template matching to identify and count ring formations over time.
 
 ## How to Use
 
